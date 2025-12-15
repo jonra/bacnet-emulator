@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Devices - BACnet Emulator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-2 sidebar p-3" style="min-height: 100vh; background-color: #f8f9fa;">
+                <h4 class="mb-4">
+                    <i class="bi bi-router"></i> BACnet Emulator
+                </h4>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" th:href="@{/}">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" th:href="@{/devices}">
+                            <i class="bi bi-device-hdd"></i> Devices
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" th:href="@{/objects}">
+                            <i class="bi bi-list-ul"></i> Objects
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" th:href="@{/network/config}">
+                            <i class="bi bi-wifi"></i> Network Config
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" th:href="@{/monitor/logs}">
+                            <i class="bi bi-journal-text"></i> Logs
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <main class="col-md-10 p-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1>Devices</h1>
+                    <a th:href="@{/devices/create}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Create Device
+                    </a>
+                </div>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Instance ID</th>
+                                    <th>Name</th>
+                                    <th>Vendor ID</th>
+                                    <th>Model</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="device : ${devices}">
+                                    <td th:text="${device.deviceInstanceId}"></td>
+                                    <td th:text="${device.deviceName}"></td>
+                                    <td th:text="${device.vendorId ?: 'N/A'}"></td>
+                                    <td th:text="${device.modelName ?: 'N/A'}"></td>
+                                    <td>
+                                        <span th:if="${device.enabled}" class="badge bg-success">Enabled</span>
+                                        <span th:unless="${device.enabled}" class="badge bg-secondary">Disabled</span>
+                                    </td>
+                                    <td>
+                                        <a th:href="@{/devices/{id}/edit(id=${device.id})}" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-pencil"></i> Edit
+                                        </a>
+                                        <a th:href="@{/objects?deviceId={id}(id=${device.id})}" class="btn btn-sm btn-outline-info">
+                                            <i class="bi bi-list-ul"></i> Objects
+                                        </a>
+                                        <form th:action="@{/devices/{id}/delete(id=${device.id})}" method="post" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                                    onclick="return confirm('Are you sure you want to delete this device?')">
+                                                <i class="bi bi-trash"></i> Delete
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <tr th:if="${devices.isEmpty()}">
+                                    <td colspan="6" class="text-center text-muted">No devices found. <a th:href="@{/devices/create}">Create one</a></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
