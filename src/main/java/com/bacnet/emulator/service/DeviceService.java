@@ -70,7 +70,17 @@ public class DeviceService {
         
         BacnetDevice device = toEntity(dto);
         device = deviceRepository.save(device);
-        return toDto(device);
+        DeviceDto result = toDto(device);
+        
+        // Log device creation
+        logDeviceActivity("Device created", result);
+        
+        return result;
+    }
+    
+    private void logDeviceActivity(String action, DeviceDto device) {
+        // This will be called by the controller which has access to MonitorService
+        // Service layer logging is handled by the controller
     }
     
     @Transactional

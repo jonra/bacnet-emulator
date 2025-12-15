@@ -1,7 +1,9 @@
 package com.bacnet.emulator.controller;
 
+import com.bacnet.emulator.dto.DeviceDto;
 import com.bacnet.emulator.dto.ObjectDto;
 import com.bacnet.emulator.service.DeviceService;
+import com.bacnet.emulator.service.MonitorService;
 import com.bacnet.emulator.service.ObjectService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
@@ -10,6 +12,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 @Controller
@@ -19,6 +22,7 @@ public class ObjectController {
     
     private final ObjectService objectService;
     private final DeviceService deviceService;
+    private final MonitorService monitorService;
     
     @GetMapping
     public String listObjects(@RequestParam(required = false) Long deviceId, Model model) {
@@ -48,7 +52,8 @@ public class ObjectController {
     public String createObject(@Valid @ModelAttribute("object") ObjectDto objectDto,
                               BindingResult result,
                               Model model,
-                              RedirectAttributes redirectAttributes) {
+                              RedirectAttributes redirectAttributes,
+                              HttpServletRequest request) {
         if (result.hasErrors()) {
             model.addAttribute("devices", deviceService.getAllDevices());
             model.addAttribute("objectTypes", getObjectTypes());
@@ -56,7 +61,15 @@ public class ObjectController {
         }
         
         try {
-            objectService.createObject(objectDto);
+            ObjectDto created = objectService.createObject(objectDto);
+            DeviceDto device = deviceService.getDeviceById(created.getDeviceId());
+            monitorService.log("INFO",
+                String.format("Object created via UI: %s (Type: %s, Instance: %d)", created.getObjectName(),
+                    created.getObjectTypeName(), created.getObjectInstance()),
+                request.getRemoteAddr(), "UI - CreateObject", device.getDeviceInstanceId(),
+                created.getObjectType(), created.getObjectInstance(),
+                String.format("Present Value: %s, Writable: %s, COV: %s", created.getPresentValue(),
+                    created.getWritable(), created.getCovEnabled()));
             redirectAttributes.addFlashAttribute("success", "Object created successfully");
             return "redirect:/objects?deviceId=" + objectDto.getDeviceId();
         } catch (Exception e) {
@@ -103,9 +116,16 @@ public class ObjectController {
     @PostMapping("/{id}/value")
     public String updateValue(@PathVariable Long id,
                              @RequestParam String presentValue,
-                             RedirectAttributes redirectAttributes) {
+                             RedirectAttributes redirectAttributes,
+                             HttpServletRequest request) {
         try {
-            objectService.updateObjectValue(id, presentValue);
+            ObjectDto updated = objectService.updateObjectValue(id, presentValue);
+            DeviceDto device = deviceService.getDeviceById(updated.getDeviceId());
+            monitorService.log("INFO",
+                String.format("Object value updated via UI: %s = %s", updated.getObjectName(), updated.getPresentValue()),
+                request.getRemoteAddr(), "UI - UpdateValue", device.getDeviceInstanceId(),
+                updated.getObjectType(), updated.getObjectInstance(),
+                String.format("Value changed to: %s", presentValue));
             redirectAttributes.addFlashAttribute("success", "Value updated successfully");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Error updating value: " + e.getMessage());

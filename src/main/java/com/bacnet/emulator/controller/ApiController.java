@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 
@@ -59,8 +60,14 @@ public class ApiController {
     })
     @PostMapping("/devices")
     public ResponseEntity<DeviceDto> createDevice(
-            @Parameter(description = "Device configuration", required = true) @RequestBody DeviceDto deviceDto) {
-        return ResponseEntity.ok(deviceService.createDevice(deviceDto));
+            @Parameter(description = "Device configuration", required = true) @RequestBody DeviceDto deviceDto,
+            HttpServletRequest request) {
+        DeviceDto created = deviceService.createDevice(deviceDto);
+        monitorService.log("INFO", 
+            String.format("Device created via API: %s (Instance ID: %d)", created.getDeviceName(), created.getDeviceInstanceId()),
+            request.getRemoteAddr(), "REST API - CreateDevice", created.getDeviceInstanceId(), null, null,
+            String.format("Device ID: %d, Vendor: %s, Model: %s", created.getId(), created.getVendorId(), created.getModelName()));
+        return ResponseEntity.ok(created);
     }
     
     @Operation(summary = "Update device", description = "Updates an existing device's properties")
@@ -73,8 +80,14 @@ public class ApiController {
     @PutMapping("/devices/{id}")
     public ResponseEntity<DeviceDto> updateDevice(
             @Parameter(description = "Device database ID", required = true) @PathVariable Long id,
-            @Parameter(description = "Updated device configuration", required = true) @RequestBody DeviceDto deviceDto) {
-        return ResponseEntity.ok(deviceService.updateDevice(id, deviceDto));
+            @Parameter(description = "Updated device configuration", required = true) @RequestBody DeviceDto deviceDto,
+            HttpServletRequest request) {
+        DeviceDto updated = deviceService.updateDevice(id, deviceDto);
+        monitorService.log("INFO",
+            String.format("Device updated via API: %s (Instance ID: %d)", updated.getDeviceName(), updated.getDeviceInstanceId()),
+            request.getRemoteAddr(), "REST API - UpdateDevice", updated.getDeviceInstanceId(), null, null,
+            String.format("Enabled: %s", updated.getEnabled()));
+        return ResponseEntity.ok(updated);
     }
     
     @Operation(summary = "Delete device", description = "Deletes a device and all its associated objects")
@@ -125,8 +138,18 @@ public class ApiController {
     })
     @PostMapping("/objects")
     public ResponseEntity<ObjectDto> createObject(
-            @Parameter(description = "Object configuration", required = true) @RequestBody ObjectDto objectDto) {
-        return ResponseEntity.ok(objectService.createObject(objectDto));
+            @Parameter(description = "Object configuration", required = true) @RequestBody ObjectDto objectDto,
+            HttpServletRequest request) {
+        ObjectDto created = objectService.createObject(objectDto);
+        DeviceDto device = deviceService.getDeviceById(created.getDeviceId());
+        monitorService.log("INFO",
+            String.format("Object created via API: %s (Type: %s, Instance: %d)", created.getObjectName(), 
+                created.getObjectTypeName(), created.getObjectInstance()),
+            request.getRemoteAddr(), "REST API - CreateObject", device.getDeviceInstanceId(), 
+            created.getObjectType(), created.getObjectInstance(),
+            String.format("Present Value: %s, Writable: %s, COV: %s", created.getPresentValue(), 
+                created.getWritable(), created.getCovEnabled()));
+        return ResponseEntity.ok(created);
     }
     
     @Operation(summary = "Update object", description = "Updates an existing object's properties and configuration")
@@ -152,9 +175,17 @@ public class ApiController {
     @PutMapping("/objects/{id}/value")
     public ResponseEntity<ObjectDto> updateObjectValue(
             @Parameter(description = "Object database ID", required = true) @PathVariable Long id,
-            @Parameter(description = "Request body containing presentValue", required = true) @RequestBody Map<String, String> request) {
+            @Parameter(description = "Request body containing presentValue", required = true) @RequestBody Map<String, String> request,
+            HttpServletRequest httpRequest) {
         String value = request.get("presentValue");
-        return ResponseEntity.ok(objectService.updateObjectValue(id, value));
+        ObjectDto updated = objectService.updateObjectValue(id, value);
+        DeviceDto device = deviceService.getDeviceById(updated.getDeviceId());
+        monitorService.log("INFO",
+            String.format("Object value updated via API: %s = %s", updated.getObjectName(), updated.getPresentValue()),
+            httpRequest.getRemoteAddr(), "REST API - UpdateValue", device.getDeviceInstanceId(),
+            updated.getObjectType(), updated.getObjectInstance(),
+            String.format("Previous value changed to: %s", value));
+        return ResponseEntity.ok(updated);
     }
     
     @Operation(summary = "Delete object", description = "Deletes an object from its device")

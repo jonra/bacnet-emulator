@@ -122,9 +122,14 @@ public class ObjectService {
         BacnetObject object = objectRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Object not found: " + id));
         
+        String oldValue = object.getPresentValue();
         object.setPresentValue(presentValue);
         object = objectRepository.save(object);
-        return toDto(object);
+        ObjectDto result = toDto(object);
+        
+        // Log value change (controller will add full logging with MonitorService)
+        
+        return result;
     }
     
     @Transactional

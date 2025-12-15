@@ -2,6 +2,7 @@ package com.bacnet.emulator.controller;
 
 import com.bacnet.emulator.dto.DeviceDto;
 import com.bacnet.emulator.service.DeviceService;
+import com.bacnet.emulator.service.MonitorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -9,6 +10,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 @Controller
@@ -17,6 +19,7 @@ import jakarta.validation.Valid;
 public class DeviceController {
     
     private final DeviceService deviceService;
+    private final MonitorService monitorService;
     
     @GetMapping
     public String listDevices(Model model) {
@@ -33,13 +36,18 @@ public class DeviceController {
     @PostMapping("/create")
     public String createDevice(@Valid @ModelAttribute("device") DeviceDto deviceDto,
                               BindingResult result,
-                              RedirectAttributes redirectAttributes) {
+                              RedirectAttributes redirectAttributes,
+                              HttpServletRequest request) {
         if (result.hasErrors()) {
             return "devices/create";
         }
         
         try {
-            deviceService.createDevice(deviceDto);
+            DeviceDto created = deviceService.createDevice(deviceDto);
+            monitorService.log("INFO",
+                String.format("Device created via UI: %s (Instance ID: %d)", created.getDeviceName(), created.getDeviceInstanceId()),
+                request.getRemoteAddr(), "UI - CreateDevice", created.getDeviceInstanceId(), null, null,
+                String.format("Device ID: %d, Vendor: %s, Model: %s", created.getId(), created.getVendorId(), created.getModelName()));
             redirectAttributes.addFlashAttribute("success", "Device created successfully");
             return "redirect:/devices";
         } catch (Exception e) {
