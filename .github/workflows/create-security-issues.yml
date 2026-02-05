@@ -1,0 +1,182 @@
+name: Create Security Issues
+
+on:
+  workflow_dispatch:  # Allows manual triggering from GitHub UI
+    inputs:
+      create_labels:
+        description: 'Create labels before creating issues'
+        required: false
+        default: 'true'
+        type: boolean
+      dry_run:
+        description: 'Dry run mode (prints issue data without creating)'
+        required: false
+        default: 'false'
+        type: boolean
+
+permissions:
+  issues: write  # Required to create issues
+  contents: read  # Required to read repository content
+
+jobs:
+  create-security-issues:
+    runs-on: ubuntu-latest
+    name: Create Security Vulnerability Issues
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Read vulnerability data
+        id: read-vulns
+        run: |
+          echo "Reading vulnerability data from .github/security-vulnerabilities.json"
+          if [ ! -f .github/security-vulnerabilities.json ]; then
+            echo "Error: security-vulnerabilities.json not found"
+            exit 1
+          fi
+          
+          # Validate JSON
+          if ! jq empty .github/security-vulnerabilities.json 2>/dev/null; then
+            echo "Error: Invalid JSON in security-vulnerabilities.json"
+            exit 1
+          fi
+          
+          echo "Vulnerability data loaded successfully"
+          
+      - name: Create labels
+        if: inputs.create_labels == 'true' || inputs.create_labels == true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Creating security labels..."
+          
+          # Read labels from JSON and create them
+          jq -r '.labels[] | "\(.name)|\(.color)|\(.description)"' .github/security-vulnerabilities.json | while IFS='|' read -r name color description; do
+            echo "Creating label: $name"
+            gh label create "$name" \
+              --color "$color" \
+              --description "$description" \
+              --force 2>&1 || echo "Label $name already exists or created"
+          done
+          
+          echo "Labels created successfully"
+      
+      - name: Create issues (dry run)
+        if: inputs.dry_run == 'true' || inputs.dry_run == true
+        run: |
+          echo "=== DRY RUN MODE - No issues will be created ==="
+          echo ""
+          
+          # Extract and display issue information
+          vulnerabilities=$(jq -c '.vulnerabilities[]' .github/security-vulnerabilities.json)
+          
+          count=1
+          echo "$vulnerabilities" | while read -r vuln; do
+            title=$(echo "$vuln" | jq -r '.title')
+            severity=$(echo "$vuln" | jq -r '.severity')
+            labels=$(echo "$vuln" | jq -r '.labels | join(",")')
+            
+            echo "Issue $count:"
+            echo "  Title: $title"
+            echo "  Severity: $severity"
+            echo "  Labels: $labels"
+            echo ""
+            
+            count=$((count + 1))
+          done
+          
+          total=$(jq '.vulnerabilities | length' .github/security-vulnerabilities.json)
+          echo "Total issues to create: $total"
+      
+      - name: Create issues
+        if: inputs.dry_run != 'true' && inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Creating security vulnerability issues..."
+          
+          # Check if issues already exist to avoid duplicates
+          existing_issues=$(gh issue list --state all --label security --json title --jq '.[].title')
+          
+          # Read and process each vulnerability
+          vulnerabilities=$(jq -c '.vulnerabilities[]' .github/security-vulnerabilities.json)
+          
+          created_count=0
+          skipped_count=0
+          
+          echo "$vulnerabilities" | while read -r vuln; do
+            title=$(echo "$vuln" | jq -r '.title')
+            description=$(echo "$vuln" | jq -r '.description')
+            labels=$(echo "$vuln" | jq -r '.labels | join(",")')
+            severity=$(echo "$vuln" | jq -r '.severity')
+            vuln_id=$(echo "$vuln" | jq -r '.id')
+            
+            # Check if issue with this title already exists
+            if echo "$existing_issues" | grep -Fq "$title"; then
+              echo "⏭️  Skipping issue $vuln_id: Already exists - $title"
+              skipped_count=$((skipped_count + 1))
+            else
+              echo "📝 Creating issue $vuln_id: $title"
+              
+              # Create the issue
+              issue_url=$(gh issue create \
+                --title "$title" \
+                --body "$description" \
+                --label "$labels" \
+                --repo "${{ github.repository }}" 2>&1)
+              
+              if [ $? -eq 0 ]; then
+                echo "✅ Created: $issue_url"
+                created_count=$((created_count + 1))
+              else
+                echo "❌ Failed to create issue: $title"
+                echo "Error: $issue_url"
+              fi
+              
+              # Small delay to avoid rate limiting
+              sleep 1
+            fi
+            
+            echo ""
+          done
+          
+          echo "==================================="
+          echo "Summary:"
+          echo "  Created: $created_count issues"
+          echo "  Skipped: $skipped_count issues (already exist)"
+          echo "==================================="
+      
+      - name: Generate summary
+        if: always()
+        run: |
+          echo "## Security Issues Creation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            echo "**Mode**: Dry Run (no issues created)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Mode**: Production (issues created)" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          total=$(jq '.vulnerabilities | length' .github/security-vulnerabilities.json)
+          echo "**Total vulnerabilities defined**: $total" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Vulnerabilities" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # List all vulnerabilities
+          jq -r '.vulnerabilities[] | "- [\(.severity | ascii_upcase)] \(.title)"' .github/security-vulnerabilities.json >> $GITHUB_STEP_SUMMARY
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Labels Created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ inputs.create_labels }}" == "true" ]; then
+            jq -r '.labels[] | "- `\(.name)` - \(.description)"' .github/security-vulnerabilities.json >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Labels were not created (create_labels was false)" >> $GITHUB_STEP_SUMMARY
+          fi
