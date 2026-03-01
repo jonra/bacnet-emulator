@@ -27,6 +27,9 @@ buildNumber.properties
 .DS_Store
 Thumbs.db
 
+# MCP (contains API keys)
+.mcp.json
+
 # Application
 data/
 *.log
