@@ -415,6 +415,46 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 - Add Javadoc comments for public APIs
 - Write unit tests for new features
 
+## 🔒 Security
+
+### Security Vulnerability Reporting
+
+Security is important for this project. If you discover a security vulnerability, please follow responsible disclosure practices:
+
+1. **Do NOT** open a public GitHub issue
+2. Email the maintainers with details
+3. Allow time for the issue to be addressed before public disclosure
+
+### Automated Security Issue Creation
+
+This repository includes a GitHub Actions workflow for creating security vulnerability issues from structured data:
+
+```bash
+# Run the workflow manually from GitHub Actions UI
+# Or using GitHub CLI:
+gh workflow run create-security-issues.yml
+
+# Preview issues without creating them (dry run):
+gh workflow run create-security-issues.yml -f dry_run=true
+```
+
+See [.github/README-security-workflow.md](.github/README-security-workflow.md) for detailed documentation on:
+- How to use the workflow
+- Adding new vulnerabilities
+- Understanding the issue format
+- OWASP Top 10 classifications
+
+### Security Analysis
+
+A comprehensive security analysis has been performed on this codebase. The analysis identified vulnerabilities in the BACnet protocol parsing implementation. All findings are documented with:
+- OWASP Top 10 2021 classifications
+- Specific code locations and line numbers
+- Risk assessments for this local development tool context
+- Concrete fix recommendations with code examples
+- Acceptance criteria for validation
+
+The workflow uses the `GITHUB_TOKEN` available in GitHub Actions, solving the authentication issue when creating issues programmatically.
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
